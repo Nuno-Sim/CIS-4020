@@ -1,11 +1,28 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+import glob
+import os
 
 # ----------------------------
-# 1. LOAD DATA
+# 1. LOAD DATA FOR 2019–2024
 # ----------------------------
-df = pd.read_csv("./data/pbp-2019.csv", low_memory=False)
+all_dfs = []
+
+for year in range(2019, 2025):   # 2019, 2020, 2021, 2022, 2023, 2024
+    path = f"./data/pbp-{year}.csv"
+    if os.path.exists(path):
+        df_year = pd.read_csv(path, low_memory=False)
+        df_year["SeasonYear"] = year     # add year column
+        all_dfs.append(df_year)
+    else:
+        print(f"Warning: {path} not found, skipping.")
+
+# Combine all years
+df = pd.concat(all_dfs, ignore_index=True)
+
+# Replace empty strings with NaN
+df.replace("", np.nan, inplace=True)
 
 # Replace empty strings with NaN
 df.replace("", np.nan, inplace=True)
@@ -74,12 +91,7 @@ cols_to_drop = [
     "IsChallengeReversed", "IsMeasurement", "PenaltyTeam", "PenaltyYards",
 
     # categorical / redundant
-    "YardLineDirection", "PassType", "RushDirection",
-    "Formation", "PlayType",
-
-    # redundant always-zero
-    "IsRush", "IsPass", "IsSack",
-
+    "YardLineDirection", "RushDirection",
     # duplicate yardline transformation
     "YardLineFixed",
 ]
@@ -94,50 +106,3 @@ df_success.to_csv("cleaned_pca_ready.csv", index=False)
 print("Finished! PCA-ready dataset saved as cleaned_pca_ready.csv")
 
 
-# ----------------------------
-# 7. LOAD CLEANED DATA
-# ----------------------------
-df = pd.read_csv("cleaned_pca_ready.csv")
-
-# Drop ID columns (not used in PCA)
-id_cols = ["GameId"]
-df_features = df.drop(columns=[c for c in id_cols if c in df.columns], errors="ignore")
-
-# ----------------------------
-# 8. STANDARDIZE FEATURES
-# ----------------------------
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(df_features)
-
-# ----------------------------
-# 9. PERFORM PCA (keep 95% variance)
-# ----------------------------
-from sklearn.decomposition import PCA
-
-pca = PCA(n_components=0.95)   # keep components that explain 95%
-X_pca = pca.fit_transform(X_scaled)
-
-# ----------------------------
-# 10. SAVE PCA-REDUCED DATASET
-# ----------------------------
-df_pca = pd.DataFrame(
-    X_pca,
-    columns=[f"PC{i+1}" for i in range(X_pca.shape[1])]
-)
-
-# Add back ID columns
-for col in id_cols:
-    if col in df.columns:
-        df_pca[col] = df[col].values
-
-df_pca.to_csv("pca_reduced.csv", index=False)
-
-# ----------------------------
-# 11. PRINT EXPLAINED VARIANCE
-# ----------------------------
-print("\nExplained Variance Ratio:")
-for i, v in enumerate(pca.explained_variance_ratio_):
-    print(f"  PC{i+1}: {v:.4f}")
-
-print(f"\nTotal Variance Explained: {pca.explained_variance_ratio_.sum():.4f}")
-print("Saved PCA dataset as pca_reduced.csv")
