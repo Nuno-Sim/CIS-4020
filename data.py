@@ -107,6 +107,8 @@ else:
 # Season is now aligned with X and y after filtering
 season_aligned = data['season']
 
+data.to_csv("data/4th-down-data.csv", index=False)
+
 # Model complexity sanity check: events per feature
 n_obs = len(data)
 n_events = int(data['success'].sum())
